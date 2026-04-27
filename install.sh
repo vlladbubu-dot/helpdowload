@@ -12,6 +12,12 @@ print_ok() { echo -e "${GREEN}[✓]${NC} $1"; }
 print_error() { echo -e "${RED}[✗]${NC} $1"; }
 print_info() { echo -e "${BLUE}[i]${NC} $1"; }
 print_warn() { echo -e "${YELLOW}[!]${NC} $1"; }
+print_header() {
+    echo ""
+    echo "=========================================="
+    echo -e "${GREEN}$1${NC}"
+    echo "=========================================="
+}
 
 # Проверка root
 if [[ $EUID -ne 0 ]]; then
