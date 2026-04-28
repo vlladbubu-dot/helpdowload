@@ -13,13 +13,13 @@ systemctl disable unattended-upgrades 2>/dev/null
 
 clear
 echo "=========================================="
-echo "       Универсальный установщик"
+echo "       Помощник в настройке вашего сервера"
 echo "=========================================="
 echo ""
 echo "1. Сайт"
-echo "2. Панель"
-echo "3. Сайт + Панель"
-echo "4. Питон бот"
+echo "2. Панель 3x-ui"
+echo "3. Сайт + Панель 3x-ui"
+echo "4. Python скрипт/бот"
 echo ""
 read -p "Выбери [1-4]: " choice
 
@@ -215,12 +215,12 @@ EOF
         systemctl start test
         
         echo ""
-        echo "✅ Python бот установлен и запущен"
+        echo "✅ Python скрипт установлен и запущен"
         echo "📁 Папка: /my_bots/test/"
         echo "📄 Файл: main.py"
         echo ""
         echo "⚠️ Ты можешь отредактировать файл: nano /my_bots/test/main.py"
-        echo "⚠️ После изменений перезапусти бота: systemctl restart test"
+        echo "⚠️ После изменений перезапусти скрипт: systemctl restart test"
         echo ""
         ;;
     
