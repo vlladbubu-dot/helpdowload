@@ -20,8 +20,9 @@ echo "1. Сайт"
 echo "2. Панель 3x-ui"
 echo "3. Сайт + Панель 3x-ui"
 echo "4. Python скрипт/бот"
+echo "5. Fail2ban"
 echo ""
-read -p "Выбери [1-4]: " choice
+read -p "Выбери [1-5]: " choice
 
 case $choice in
     1)
@@ -248,6 +249,46 @@ EOF
         echo ""
         echo "⚠️ Ты можешь отредактировать файл: nano /my_bots/test/main.py"
         echo "⚠️ После изменений перезапусти скрипт: systemctl restart test"
+        echo ""
+        ;;
+    
+    5)
+        apt update -y
+        apt install -y fail2ban
+        
+        cat > /etc/fail2ban/jail.local <<EOF
+[DEFAULT]
+bantime = -1
+findtime = 600
+maxretry = 3
+
+[sshd]
+enabled = true
+port = ssh
+logpath = %(sshd_log)s
+maxretry = 3
+bantime = -1
+
+[sshd-ddos]
+enabled = true
+port = ssh
+logpath = %(sshd_log)s
+maxretry = 3
+bantime = -1
+EOF
+        
+        systemctl restart fail2ban
+        systemctl enable fail2ban
+        
+        echo ""
+        echo "✅ Fail2ban установлен и настроен"
+        echo "📝 Максимум попыток: 3"
+        echo "⏱️ Время бана: навсегда"
+        echo ""
+        echo "🔧 Управление:"
+        echo "💡 Посмотреть забаненных: fail2ban-client status sshd"
+        echo "💡 Разбанить IP: fail2ban-client set sshd unbanip IP"
+        echo "💡 Статус: systemctl status fail2ban"
         echo ""
         ;;
     
