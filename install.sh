@@ -1,5 +1,4 @@
 #!/bin/bash
-
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
@@ -8,6 +7,10 @@ if [[ $EUID -ne 0 ]]; then
     echo "Запусти с sudo!"
     exit 1
 fi
+
+# Отключаем автообновление на время установки
+systemctl stop unattended-upgrades 2>/dev/null
+systemctl disable unattended-upgrades 2>/dev/null
 
 clear
 echo "=========================================="
@@ -84,7 +87,6 @@ EOF
     
     2)
         bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh)
-        
         echo ""
         echo "✅ Панель установлена"
         echo ""
@@ -171,3 +173,7 @@ EOF
         exit 1
         ;;
 esac
+
+# Включаем автообновление обратно
+systemctl enable unattended-upgrades 2>/dev/null
+systemctl start unattended-upgrades 2>/dev/null
