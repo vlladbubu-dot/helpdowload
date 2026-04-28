@@ -8,7 +8,6 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
-# Отключаем автообновление на время установки
 systemctl stop unattended-upgrades 2>/dev/null
 systemctl disable unattended-upgrades 2>/dev/null
 
@@ -17,11 +16,12 @@ echo "=========================================="
 echo "       Универсальный установщик"
 echo "=========================================="
 echo ""
-echo "1. Установить сайт (Nginx + SSL)"
-echo "2. Установить панель 3x-ui"
-echo "3. Установить всё вместе"
+echo "1. Сайт"
+echo "2. Панель"
+echo "3. Сайт + Панель"
+echo "4. Питон бот"
 echo ""
-read -p "Выбери [1-3]: " choice
+read -p "Выбери [1-4]: " choice
 
 case $choice in
     1)
@@ -168,12 +168,67 @@ EOF
         echo ""
         ;;
     
+    4)
+        mkdir -p /my_bots/test
+        cd /my_bots/test
+        
+        cat > main.py <<EOF
+import time
+import datetime
+
+def main():
+    print(f"Бот запущен: {datetime.datetime.now()}")
+    while True:
+        print("Работаю...")
+        time.sleep(60)
+
+if __name__ == "__main__":
+    main()
+EOF
+        
+        apt install -y python3.12-venv
+        python3 -m venv venv
+        source venv/bin/activate
+        
+        mkdir -p systemd
+        cat > systemd/test.service <<EOF
+[Unit]
+Description=test
+After=syslog.target
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/my_bots/test/
+ExecStart=/my_bots/test/venv/bin/python3 /my_bots/test/main.py
+RestartSec=10
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOF
+        
+        apt install -y systemd
+        systemctl daemon-reload
+        systemctl enable /my_bots/test/systemd/test.service
+        systemctl start test
+        
+        echo ""
+        echo "✅ Python бот установлен и запущен"
+        echo "📁 Папка: /my_bots/test/"
+        echo "📄 Файл: main.py"
+        echo ""
+        echo "⚠️ Ты можешь отредактировать файл: nano /my_bots/test/main.py"
+        echo "⚠️ После изменений перезапусти бота: systemctl restart test"
+        echo ""
+        ;;
+    
     *)
         echo "Неверный выбор"
         exit 1
         ;;
 esac
 
-# Включаем автообновление обратно
 systemctl enable unattended-upgrades 2>/dev/null
 systemctl start unattended-upgrades 2>/dev/null
