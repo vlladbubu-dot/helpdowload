@@ -10,7 +10,6 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
-# Жесткая очистка
 pkill -9 apt 2>/dev/null
 pkill -9 apt-get 2>/dev/null
 pkill -9 unattended-upgrades 2>/dev/null
@@ -18,18 +17,14 @@ systemctl stop unattended-upgrades 2>/dev/null
 systemctl disable unattended-upgrades 2>/dev/null
 sleep 2
 
-# Снимаем все блокировки
 rm -f /var/lib/dpkg/lock-frontend
 rm -f /var/lib/dpkg/lock
 rm -f /var/cache/apt/archives/lock
 rm -f /var/lib/apt/lists/lock
 dpkg --configure -a
 
-# Очищаем кэш и списки
 apt clean
-apt autoclean
-rm -rf /var/lib/apt/lists/*
-apt update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -y
+apt update -y
 
 clear
 echo "=========================================="
@@ -41,9 +36,8 @@ echo "2. Панель 3x-ui"
 echo "3. Сайт + Панель 3x-ui"
 echo "4. Python скрипт/бот"
 echo "5. Fail2ban"
-echo "6. MTProto Proxy (Telegram)"
 echo ""
-read -p "Выбери [1-6]: " choice
+read -p "Выбери [1-5]: " choice
 
 case $choice in
     1)
@@ -56,7 +50,6 @@ case $choice in
             IS_SUBDOMAIN=false
         fi
         
-        apt update -o Acquire::http::Timeout=10 -y
         apt install -y nginx certbot python3-certbot-nginx
         
         mkdir -p /var/www/$DOMAIN/html
@@ -326,7 +319,6 @@ EOF
             IS_SUBDOMAIN=false
         fi
         
-        apt update -o Acquire::http::Timeout=10 -y
         apt install -y nginx certbot python3-certbot-nginx
         
         mkdir -p /var/www/$DOMAIN/html
@@ -599,10 +591,7 @@ EOF
             
             if [[ -n "$LIBRARIES" ]]; then
                 NEED_PIP=true
-                PIP_PACKAGES=""
-                for lib in $LIBRARIES; do
-                    PIP_PACKAGES="$PIP_PACKAGES $lib"
-                done
+                PIP_PACKAGES="$LIBRARIES"
             else
                 NEED_PIP=false
             fi
@@ -610,15 +599,13 @@ EOF
         
         apt install -y python3.12-venv python3-pip
         
+        python3 -m venv venv
+        source venv/bin/activate
+        
         if [[ "$NEED_PIP" == true ]]; then
-            python3 -m venv venv
-            source venv/bin/activate
             echo -e "${YELLOW}📦 Устанавливаю библиотеки:${NC} $PIP_PACKAGES"
-            pip install --no-cache-dir $PIP_PACKAGES
+            pip install $PIP_PACKAGES
             echo -e "${GREEN}✅ Библиотеки установлены${NC}"
-        else
-            python3 -m venv venv
-            source venv/bin/activate
         fi
         
         cat > /etc/systemd/system/$SERVICE_NAME.service <<EOF
@@ -664,7 +651,6 @@ EOF
         ;;
     
     5)
-        apt update -o Acquire::http::Timeout=10 -y
         apt install -y fail2ban
         
         cat > /etc/fail2ban/jail.local <<EOF
@@ -700,59 +686,6 @@ EOF
         echo "💡 Посмотреть забаненных: fail2ban-client status sshd"
         echo "💡 Разбанить IP: fail2ban-client set sshd unbanip IP"
         echo "💡 Статус: systemctl status fail2ban"
-        echo ""
-        ;;
-    
-    6)
-        MT_PROXY_PORT=443
-        
-        echo -e "${YELLOW}🔧 Устанавливаю MTProto Proxy через Docker...${NC}"
-        
-        apt update -o Acquire::http::Timeout=10 -y
-        apt install -y docker.io
-        systemctl enable docker
-        systemctl start docker
-        
-        docker stop mtproto-proxy 2>/dev/null
-        docker rm mtproto-proxy 2>/dev/null
-        
-        SECRET=$(head -c 16 /dev/urandom | xxd -ps)
-        
-        docker run -d \
-            --name=mtproto-proxy \
-            --restart=always \
-            -p $MT_PROXY_PORT:443 \
-            -v proxy-config:/data \
-            telegrammessenger/proxy:latest
-        
-        sleep 5
-        
-        SERVER_IP=$(curl -s ifconfig.me)
-        
-        echo ""
-        echo -e "${GREEN}✅ MTProto Proxy установлен через Docker!${NC}"
-        echo ""
-        echo -e "${BLUE}📋 Данные для подключения:${NC}"
-        echo -e "${YELLOW}   Сервер:${NC} $SERVER_IP"
-        echo -e "${YELLOW}   Порт:${NC} $MT_PROXY_PORT"
-        echo -e "${YELLOW}   Секрет:${NC} $SECRET"
-        echo ""
-        echo -e "${GREEN}🔗 Ссылка для Telegram:${NC}"
-        echo -e "${BLUE}   tg://proxy?server=$SERVER_IP&port=$MT_PROXY_PORT&secret=$SECRET${NC}"
-        echo ""
-        echo -e "${YELLOW}💡 Как подключиться:${NC}"
-        echo "   1. Открой Telegram → Настройки → Данные и память"
-        echo "   2. Нажми 'Использовать прокси' → 'Добавить прокси'"
-        echo "   3. Тип: MTProto, введи сервер, порт и секрет"
-        echo ""
-        echo -e "${YELLOW}🔧 Управление прокси:${NC}"
-        echo "   💡 Посмотреть секрет: docker exec mtproto-proxy cat /data/secret"
-        echo "   💡 Остановить:        docker stop mtproto-proxy"
-        echo "   💡 Запустить:         docker start mtproto-proxy"
-        echo "   💡 Статус:            docker ps | grep mtproto-proxy"
-        echo "   💡 Логи:              docker logs -f mtproto-proxy"
-        echo ""
-        echo -e "${RED}⚠️ НЕ ЗАБУДЬ ОТКРЫТЬ ПОРТ $MT_PROXY_PORT В ФАЕРВОЛЕ ХОСТИНГА!${NC}"
         echo ""
         ;;
     
