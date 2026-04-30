@@ -34,6 +34,7 @@ case $choice in
             IS_SUBDOMAIN=false
         fi
         
+        apt update -y
         apt install -y nginx certbot python3-certbot-nginx
         
         mkdir -p /var/www/$DOMAIN/html
@@ -303,6 +304,7 @@ EOF
             IS_SUBDOMAIN=false
         fi
         
+        apt update -y
         apt install -y nginx certbot python3-certbot-nginx
         
         mkdir -p /var/www/$DOMAIN/html
@@ -581,6 +583,7 @@ EOF
             fi
         fi
         
+        apt update -y
         apt install -y python3.12-venv python3-pip
         
         python3 -m venv venv
@@ -635,6 +638,7 @@ EOF
         ;;
     
     5)
+        apt update -y
         apt install -y fail2ban
         
         cat > /etc/fail2ban/jail.local <<EOF
