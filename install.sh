@@ -575,14 +575,38 @@ EOF
         if [[ -z "$SCRIPT_CONTENT" ]]; then
             echo "$DEFAULT_SCRIPT" > main.py
             echo -e "${GREEN}✅ Использован стандартный скрипт${NC}"
+            NEED_PIP=false
         else
             echo "$SCRIPT_CONTENT" > main.py
-            echo -e "${GREEN}✅ Использован твой скрипт${NC}"
+            echo -e "${GREEN}✅ Твой скрипт сохранен${NC}"
+            
+            echo ""
+            echo -e "${YELLOW}📦 Какие библиотеки использует твой скрипт?${NC}"
+            echo -e "${BLUE}💡 Введи названия через пробел (например: requests telebot asyncio)${NC}"
+            echo -e "${BLUE}💡 Если библиотеки не нужны, просто нажми Enter${NC}"
+            echo ""
+            read -p "Библиотеки: " LIBRARIES
+            
+            if [[ -n "$LIBRARIES" ]]; then
+                NEED_PIP=true
+                PIP_PACKAGES=""
+                for lib in $LIBRARIES; do
+                    PIP_PACKAGES="$PIP_PACKAGES $lib"
+                done
+            else
+                NEED_PIP=false
+            fi
         fi
         
-        apt install -y python3.12-venv
+        apt install -y python3.12-venv python3-pip
         python3 -m venv venv
         source venv/bin/activate
+        
+        if [[ "$NEED_PIP" == true ]]; then
+            echo -e "${YELLOW}📦 Устанавливаю библиотеки:${NC} $PIP_PACKAGES"
+            pip install $PIP_PACKAGES
+            echo -e "${GREEN}✅ Библиотеки установлены${NC}"
+        fi
         
         cat > /etc/systemd/system/$SERVICE_NAME.service <<EOF
 [Unit]
@@ -610,6 +634,9 @@ EOF
         echo -e "${GREEN}✅ Python скрипт '$SERVICE_NAME' установлен и запущен${NC}"
         echo -e "${YELLOW}📁 Папка:${NC} /my_bots/$SERVICE_NAME/"
         echo -e "${YELLOW}📄 Файл:${NC} main.py"
+        if [[ "$NEED_PIP" == true ]]; then
+            echo -e "${YELLOW}📦 Установленные библиотеки:${NC} $PIP_PACKAGES"
+        fi
         echo ""
         echo -e "${BLUE}🔧 Управление скриптом:${NC}"
         echo -e "   💡 Остановить:     ${GREEN}systemctl stop $SERVICE_NAME${NC}"
