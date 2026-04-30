@@ -582,7 +582,7 @@ EOF
             
             echo ""
             echo -e "${YELLOW}📦 Какие библиотеки использует твой скрипт?${NC}"
-            echo -e "${BLUE}💡 Введи названия через пробел (например: requests telebot asyncio)${NC}"
+            echo -e "${BLUE}💡 Введи названия через пробел (например: aiogram pycryptodome requests)${NC}"
             echo -e "${BLUE}💡 Если библиотеки не нужны, просто нажми Enter${NC}"
             echo ""
             read -p "Библиотеки: " LIBRARIES
@@ -591,7 +591,19 @@ EOF
                 NEED_PIP=true
                 PIP_PACKAGES=""
                 for lib in $LIBRARIES; do
-                    PIP_PACKAGES="$PIP_PACKAGES $lib"
+                    if [[ "$lib" == "pycryptodome" ]]; then
+                        PIP_PACKAGES="$PIP_PACKAGES pycryptodome"
+                    elif [[ "$lib" == "aiogram" ]]; then
+                        PIP_PACKAGES="$PIP_PACKAGES aiogram"
+                    elif [[ "$lib" == "requests" ]]; then
+                        PIP_PACKAGES="$PIP_PACKAGES requests"
+                    elif [[ "$lib" == "aiohttp" ]]; then
+                        PIP_PACKAGES="$PIP_PACKAGES aiohttp"
+                    elif [[ "$lib" == "asyncio" ]]; then
+                        PIP_PACKAGES="$PIP_PACKAGES asyncio"
+                    else
+                        PIP_PACKAGES="$PIP_PACKAGES $lib"
+                    fi
                 done
             else
                 NEED_PIP=false
