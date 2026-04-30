@@ -10,19 +10,26 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
+# Жесткая очистка
+pkill -9 apt 2>/dev/null
+pkill -9 apt-get 2>/dev/null
+pkill -9 unattended-upgrades 2>/dev/null
 systemctl stop unattended-upgrades 2>/dev/null
 systemctl disable unattended-upgrades 2>/dev/null
-killall unattended-upgrades 2>/dev/null
-killall apt 2>/dev/null
-killall apt-get 2>/dev/null
-sleep 3
+sleep 2
+
+# Снимаем все блокировки
 rm -f /var/lib/dpkg/lock-frontend
 rm -f /var/lib/dpkg/lock
 rm -f /var/cache/apt/archives/lock
+rm -f /var/lib/apt/lists/lock
 dpkg --configure -a
 
+# Очищаем кэш и списки
 apt clean
-apt update --fix-missing -y
+apt autoclean
+rm -rf /var/lib/apt/lists/*
+apt update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -y
 
 clear
 echo "=========================================="
@@ -49,8 +56,8 @@ case $choice in
             IS_SUBDOMAIN=false
         fi
         
-        apt update -y
-        apt install -y nginx certbot python3-certbot-nginx --no-install-recommends
+        apt update -o Acquire::http::Timeout=10 -y
+        apt install -y nginx certbot python3-certbot-nginx
         
         mkdir -p /var/www/$DOMAIN/html
         
@@ -319,8 +326,8 @@ EOF
             IS_SUBDOMAIN=false
         fi
         
-        apt update -y
-        apt install -y nginx certbot python3-certbot-nginx --no-install-recommends
+        apt update -o Acquire::http::Timeout=10 -y
+        apt install -y nginx certbot python3-certbot-nginx
         
         mkdir -p /var/www/$DOMAIN/html
         
@@ -601,7 +608,7 @@ EOF
             fi
         fi
         
-        apt install -y python3.12-venv python3-pip --no-install-recommends
+        apt install -y python3.12-venv python3-pip
         
         if [[ "$NEED_PIP" == true ]]; then
             python3 -m venv venv
@@ -657,8 +664,8 @@ EOF
         ;;
     
     5)
-        apt update -y
-        apt install -y fail2ban --no-install-recommends
+        apt update -o Acquire::http::Timeout=10 -y
+        apt install -y fail2ban
         
         cat > /etc/fail2ban/jail.local <<EOF
 [DEFAULT]
@@ -701,8 +708,8 @@ EOF
         
         echo -e "${YELLOW}🔧 Устанавливаю MTProto Proxy через Docker...${NC}"
         
-        apt update -y
-        apt install -y docker.io --no-install-recommends
+        apt update -o Acquire::http::Timeout=10 -y
+        apt install -y docker.io
         systemctl enable docker
         systemctl start docker
         
