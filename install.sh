@@ -2,13 +2,23 @@
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
-BLUE='\033[0;34m'
 NC='\033[0m'
 
 if [[ $EUID -ne 0 ]]; then
     echo "Запусти с sudo!"
     exit 1
 fi
+
+systemctl stop unattended-upgrades 2>/dev/null
+systemctl disable unattended-upgrades 2>/dev/null
+killall unattended-upgrades 2>/dev/null
+killall apt 2>/dev/null
+killall apt-get 2>/dev/null
+sleep 3
+rm -f /var/lib/dpkg/lock-frontend
+rm -f /var/lib/dpkg/lock
+rm -f /var/cache/apt/archives/lock
+dpkg --configure -a
 
 clear
 echo "=========================================="
@@ -34,7 +44,7 @@ case $choice in
             IS_SUBDOMAIN=false
         fi
         
-        apt update --fix-missing -y
+        apt update -y
         apt install -y nginx certbot python3-certbot-nginx
         
         mkdir -p /var/www/$DOMAIN/html
@@ -304,7 +314,7 @@ EOF
             IS_SUBDOMAIN=false
         fi
         
-        apt update --fix-missing -y
+        apt update -y
         apt install -y nginx certbot python3-certbot-nginx
         
         mkdir -p /var/www/$DOMAIN/html
@@ -524,88 +534,39 @@ EOF
         ;;
     
     4)
-        read -p "Введи имя службы (например: mybot, test, app): " SERVICE_NAME
-        if [[ -z "$SERVICE_NAME" ]]; then
-            SERVICE_NAME="mybot"
-        fi
+        mkdir -p /my_bots/test
+        cd /my_bots/test
         
-        SERVICE_NAME=$(echo "$SERVICE_NAME" | tr ' ' '_' | tr -cd 'a-zA-Z0-9_-')
-        
-        mkdir -p /my_bots/$SERVICE_NAME
-        cd /my_bots/$SERVICE_NAME
-        
-        echo ""
-        echo -e "${YELLOW}📝 Введи код Python скрипта (Enter - будет использован простой скрипт):${NC}"
-        echo -e "${BLUE}💡 Когда закончишь писать, нажми Ctrl+D${NC}"
-        echo ""
-        
-        read -r -d '' DEFAULT_SCRIPT <<'EOF'
+        cat > main.py <<EOF
 import time
 import datetime
 
 def main():
-    print(f"Бот {SERVICE_NAME} запущен: {datetime.datetime.now()}")
+    print(f"Бот запущен: {datetime.datetime.now()}")
     while True:
-        print(f"{SERVICE_NAME}: Работаю... {datetime.datetime.now()}")
+        print("Работаю...")
         time.sleep(60)
 
 if __name__ == "__main__":
     main()
 EOF
         
-        DEFAULT_SCRIPT=$(echo "$DEFAULT_SCRIPT" | sed "s/{SERVICE_NAME}/$SERVICE_NAME/g")
-        
-        TEMP_FILE=$(mktemp)
-        cat > "$TEMP_FILE"
-        SCRIPT_CONTENT=$(cat "$TEMP_FILE")
-        rm -f "$TEMP_FILE"
-        
-        if [[ -z "$SCRIPT_CONTENT" ]]; then
-            echo "$DEFAULT_SCRIPT" > main.py
-            echo -e "${GREEN}✅ Использован стандартный скрипт${NC}"
-            NEED_PIP=false
-        else
-            echo "$SCRIPT_CONTENT" > main.py
-            echo -e "${GREEN}✅ Твой скрипт сохранен${NC}"
-            
-            echo ""
-            echo -e "${YELLOW}📦 Какие библиотеки использует твой скрипт?${NC}"
-            echo -e "${BLUE}💡 Введи названия через пробел (например: aiogram pycryptodome requests)${NC}"
-            echo -e "${BLUE}💡 Если библиотеки не нужны, просто нажми Enter${NC}"
-            echo ""
-            read -p "Библиотеки: " LIBRARIES
-            
-            if [[ -n "$LIBRARIES" ]]; then
-                NEED_PIP=true
-                PIP_PACKAGES="$LIBRARIES"
-            else
-                NEED_PIP=false
-            fi
-        fi
-        
-        apt update --fix-missing -y
-        apt install -y python3.12-venv python3-pip
-        
+        apt install -y python3.12-venv
         python3 -m venv venv
         source venv/bin/activate
         
-        if [[ "$NEED_PIP" == true ]]; then
-            echo -e "${YELLOW}📦 Устанавливаю библиотеки:${NC} $PIP_PACKAGES"
-            pip install $PIP_PACKAGES
-            echo -e "${GREEN}✅ Библиотеки установлены${NC}"
-        fi
-        
-        cat > /etc/systemd/system/$SERVICE_NAME.service <<EOF
+        mkdir -p systemd
+        cat > systemd/test.service <<EOF
 [Unit]
-Description=$SERVICE_NAME
+Description=test
 After=syslog.target
 After=network.target
 
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/my_bots/$SERVICE_NAME/
-ExecStart=/my_bots/$SERVICE_NAME/venv/bin/python3 /my_bots/$SERVICE_NAME/main.py
+WorkingDirectory=/my_bots/test/
+ExecStart=/my_bots/test/venv/bin/python3 /my_bots/test/main.py
 RestartSec=10
 Restart=always
 
@@ -613,32 +574,30 @@ Restart=always
 WantedBy=multi-user.target
 EOF
         
+        apt install -y systemd
         systemctl daemon-reload
-        systemctl enable $SERVICE_NAME
-        systemctl start $SERVICE_NAME
+        systemctl enable /my_bots/test/systemd/test.service
+        systemctl start test
         
         echo ""
-        echo -e "${GREEN}✅ Python скрипт '$SERVICE_NAME' установлен и запущен${NC}"
-        echo -e "${YELLOW}📁 Папка:${NC} /my_bots/$SERVICE_NAME/"
-        echo -e "${YELLOW}📄 Файл:${NC} main.py"
-        if [[ "$NEED_PIP" == true ]]; then
-            echo -e "${YELLOW}📦 Установленные библиотеки:${NC} $PIP_PACKAGES"
-        fi
+        echo "✅ Python скрипт установлен и запущен"
+        echo "📁 Папка: /my_bots/test/"
+        echo "📄 Файл: main.py"
         echo ""
-        echo -e "${BLUE}🔧 Управление скриптом:${NC}"
-        echo -e "   💡 Остановить:     ${GREEN}systemctl stop $SERVICE_NAME${NC}"
-        echo -e "   💡 Запустить:      ${GREEN}systemctl start $SERVICE_NAME${NC}"
-        echo -e "   💡 Перезапустить:  ${GREEN}systemctl restart $SERVICE_NAME${NC}"
-        echo -e "   💡 Статус:         ${GREEN}systemctl status $SERVICE_NAME${NC}"
-        echo -e "   💡 Логи:           ${GREEN}journalctl -u $SERVICE_NAME -f${NC}"
+        echo "🔧 Управление скриптом:"
+        echo "💡 Остановить: systemctl stop test"
+        echo "💡 Запустить: systemctl start test"
+        echo "💡 Перезапустить: systemctl restart test"
+        echo "💡 Посмотреть статус: systemctl status test"
+        echo "💡 Посмотреть логи: journalctl -u test -f"
         echo ""
-        echo -e "${YELLOW}⚠️ Редактирование:${NC} nano /my_bots/$SERVICE_NAME/main.py"
-        echo -e "${YELLOW}⚠️ После изменений:${NC} systemctl restart $SERVICE_NAME"
+        echo "⚠️ Ты можешь отредактировать файл: nano /my_bots/test/main.py"
+        echo "⚠️ После изменений перезапусти скрипт: systemctl restart test"
         echo ""
         ;;
     
     5)
-        apt update --fix-missing -y
+        apt update -y
         apt install -y fail2ban
         
         cat > /etc/fail2ban/jail.local <<EOF
@@ -682,3 +641,6 @@ EOF
         exit 1
         ;;
 esac
+
+systemctl enable unattended-upgrades 2>/dev/null
+systemctl start unattended-upgrades 2>/dev/null
