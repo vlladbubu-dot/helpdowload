@@ -10,22 +10,6 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
-pkill -9 apt 2>/dev/null
-pkill -9 apt-get 2>/dev/null
-pkill -9 unattended-upgrades 2>/dev/null
-systemctl stop unattended-upgrades 2>/dev/null
-systemctl disable unattended-upgrades 2>/dev/null
-sleep 2
-
-rm -f /var/lib/dpkg/lock-frontend
-rm -f /var/lib/dpkg/lock
-rm -f /var/cache/apt/archives/lock
-rm -f /var/lib/apt/lists/lock
-dpkg --configure -a
-
-apt clean
-apt update -y
-
 clear
 echo "=========================================="
 echo "       Помощник в настройке вашего сервера"
@@ -694,6 +678,3 @@ EOF
         exit 1
         ;;
 esac
-
-systemctl enable unattended-upgrades 2>/dev/null
-systemctl start unattended-upgrades 2>/dev/null
