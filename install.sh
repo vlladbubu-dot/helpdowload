@@ -21,6 +21,9 @@ rm -f /var/lib/dpkg/lock
 rm -f /var/cache/apt/archives/lock
 dpkg --configure -a
 
+apt clean
+apt update --fix-missing -y
+
 clear
 echo "=========================================="
 echo "       Помощник в настройке вашего сервера"
@@ -47,7 +50,7 @@ case $choice in
         fi
         
         apt update -y
-        apt install -y nginx certbot python3-certbot-nginx
+        apt install -y nginx certbot python3-certbot-nginx --no-install-recommends
         
         mkdir -p /var/www/$DOMAIN/html
         
@@ -317,7 +320,7 @@ EOF
         fi
         
         apt update -y
-        apt install -y nginx certbot python3-certbot-nginx
+        apt install -y nginx certbot python3-certbot-nginx --no-install-recommends
         
         mkdir -p /var/www/$DOMAIN/html
         
@@ -591,33 +594,24 @@ EOF
                 NEED_PIP=true
                 PIP_PACKAGES=""
                 for lib in $LIBRARIES; do
-                    if [[ "$lib" == "pycryptodome" ]]; then
-                        PIP_PACKAGES="$PIP_PACKAGES pycryptodome"
-                    elif [[ "$lib" == "aiogram" ]]; then
-                        PIP_PACKAGES="$PIP_PACKAGES aiogram"
-                    elif [[ "$lib" == "requests" ]]; then
-                        PIP_PACKAGES="$PIP_PACKAGES requests"
-                    elif [[ "$lib" == "aiohttp" ]]; then
-                        PIP_PACKAGES="$PIP_PACKAGES aiohttp"
-                    elif [[ "$lib" == "asyncio" ]]; then
-                        PIP_PACKAGES="$PIP_PACKAGES asyncio"
-                    else
-                        PIP_PACKAGES="$PIP_PACKAGES $lib"
-                    fi
+                    PIP_PACKAGES="$PIP_PACKAGES $lib"
                 done
             else
                 NEED_PIP=false
             fi
         fi
         
-        apt install -y python3.12-venv python3-pip
-        python3 -m venv venv
-        source venv/bin/activate
+        apt install -y python3.12-venv python3-pip --no-install-recommends
         
         if [[ "$NEED_PIP" == true ]]; then
+            python3 -m venv venv
+            source venv/bin/activate
             echo -e "${YELLOW}📦 Устанавливаю библиотеки:${NC} $PIP_PACKAGES"
-            pip install $PIP_PACKAGES
+            pip install --no-cache-dir $PIP_PACKAGES
             echo -e "${GREEN}✅ Библиотеки установлены${NC}"
+        else
+            python3 -m venv venv
+            source venv/bin/activate
         fi
         
         cat > /etc/systemd/system/$SERVICE_NAME.service <<EOF
@@ -664,7 +658,7 @@ EOF
     
     5)
         apt update -y
-        apt install -y fail2ban
+        apt install -y fail2ban --no-install-recommends
         
         cat > /etc/fail2ban/jail.local <<EOF
 [DEFAULT]
@@ -708,7 +702,7 @@ EOF
         echo -e "${YELLOW}🔧 Устанавливаю MTProto Proxy через Docker...${NC}"
         
         apt update -y
-        apt install -y docker.io
+        apt install -y docker.io --no-install-recommends
         systemctl enable docker
         systemctl start docker
         
@@ -724,13 +718,9 @@ EOF
             -v proxy-config:/data \
             telegrammessenger/proxy:latest
         
-        sleep 3
+        sleep 5
         
         SERVER_IP=$(curl -s ifconfig.me)
-        
-        docker logs mtproto-proxy 2>&1 | grep -E "tg://proxy|Secret" | head -5
-        
-        ufw allow $MT_PROXY_PORT/tcp 2>/dev/null
         
         echo ""
         echo -e "${GREEN}✅ MTProto Proxy установлен через Docker!${NC}"
@@ -750,15 +740,12 @@ EOF
         echo ""
         echo -e "${YELLOW}🔧 Управление прокси:${NC}"
         echo "   💡 Посмотреть секрет: docker exec mtproto-proxy cat /data/secret"
-        echo "   💡 Посмотреть ссылку: docker logs mtproto-proxy | grep tg://"
         echo "   💡 Остановить:        docker stop mtproto-proxy"
         echo "   💡 Запустить:         docker start mtproto-proxy"
         echo "   💡 Статус:            docker ps | grep mtproto-proxy"
         echo "   💡 Логи:              docker logs -f mtproto-proxy"
         echo ""
         echo -e "${RED}⚠️ НЕ ЗАБУДЬ ОТКРЫТЬ ПОРТ $MT_PROXY_PORT В ФАЕРВОЛЕ ХОСТИНГА!${NC}"
-        echo -e "${YELLOW}💡 Если ufw активен, порт уже открыт автоматически${NC}"
-        echo -e "${YELLOW}💡 Также проверь панель хостинга - нужно открыть TCP $MT_PROXY_PORT${NC}"
         echo ""
         ;;
     
