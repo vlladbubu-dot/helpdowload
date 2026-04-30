@@ -703,62 +703,37 @@ EOF
         ;;
     
     6)
-        MT_PROXY_PORT=1047
+        MT_PROXY_PORT=443
         
-        echo -e "${YELLOW}🔧 Устанавливаю MTProto Proxy на порт $MT_PROXY_PORT...${NC}"
+        echo -e "${YELLOW}🔧 Устанавливаю MTProto Proxy через Docker...${NC}"
         
         apt update -y
-        apt install -y git curl build-essential
+        apt install -y docker.io
+        systemctl enable docker
+        systemctl start docker
         
-        cd /opt
-        
-        if [ -d "mtprotoproxy" ]; then
-            rm -rf mtprotoproxy
-        fi
-        
-        git clone https://github.com/alexbers/mtprotoproxy.git
-        cd mtprotoproxy
+        docker stop mtproto-proxy 2>/dev/null
+        docker rm mtproto-proxy 2>/dev/null
         
         SECRET=$(head -c 16 /dev/urandom | xxd -ps)
         
-        cat > config.py <<EOF
-PORT = $MT_PROXY_PORT
-USERS = {
-    "$SECRET": [-1.0, False],
-}
-EOF
+        docker run -d \
+            --name=mtproto-proxy \
+            --restart=always \
+            -p $MT_PROXY_PORT:443 \
+            -v proxy-config:/data \
+            telegrammessenger/proxy:latest
         
-        apt install -y python3 python3-crypto
-        
-        useradd -r -s /bin/false mtproxy 2>/dev/null
-        
-        cat > /etc/systemd/system/mtproxy.service <<EOF
-[Unit]
-Description=MTProto Proxy Server
-After=network.target
-
-[Service]
-Type=simple
-WorkingDirectory=/opt/mtprotoproxy
-ExecStart=/usr/bin/python3 /opt/mtprotoproxy/mtprotoproxy.py
-Restart=on-failure
-RestartSec=10
-User=mtproxy
-
-[Install]
-WantedBy=multi-user.target
-EOF
-        
-        ufw allow $MT_PROXY_PORT/tcp 2>/dev/null
-        
-        systemctl daemon-reload
-        systemctl enable mtproxy
-        systemctl start mtproxy
+        sleep 3
         
         SERVER_IP=$(curl -s ifconfig.me)
         
+        docker logs mtproto-proxy 2>&1 | grep -E "tg://proxy|Secret" | head -5
+        
+        ufw allow $MT_PROXY_PORT/tcp 2>/dev/null
+        
         echo ""
-        echo -e "${GREEN}✅ MTProto Proxy установлен!${NC}"
+        echo -e "${GREEN}✅ MTProto Proxy установлен через Docker!${NC}"
         echo ""
         echo -e "${BLUE}📋 Данные для подключения:${NC}"
         echo -e "${YELLOW}   Сервер:${NC} $SERVER_IP"
@@ -771,18 +746,19 @@ EOF
         echo -e "${YELLOW}💡 Как подключиться:${NC}"
         echo "   1. Открой Telegram → Настройки → Данные и память"
         echo "   2. Нажми 'Использовать прокси' → 'Добавить прокси'"
-        echo "   3. Тип: MTProto, Введи сервер, порт и секрет"
-        echo "   4. Или просто нажми на ссылку выше (на телефоне)"
+        echo "   3. Тип: MTProto, введи сервер, порт и секрет"
         echo ""
         echo -e "${YELLOW}🔧 Управление прокси:${NC}"
-        echo "   💡 Запустить:   systemctl start mtproxy"
-        echo "   💡 Остановить:  systemctl stop mtproxy"
-        echo "   💡 Перезапуск:  systemctl restart mtproxy"
-        echo "   💡 Статус:      systemctl status mtproxy"
-        echo "   💡 Логи:        journalctl -u mtproxy -f"
+        echo "   💡 Посмотреть секрет: docker exec mtproto-proxy cat /data/secret"
+        echo "   💡 Посмотреть ссылку: docker logs mtproto-proxy | grep tg://"
+        echo "   💡 Остановить:        docker stop mtproto-proxy"
+        echo "   💡 Запустить:         docker start mtproto-proxy"
+        echo "   💡 Статус:            docker ps | grep mtproto-proxy"
+        echo "   💡 Логи:              docker logs -f mtproto-proxy"
         echo ""
         echo -e "${RED}⚠️ НЕ ЗАБУДЬ ОТКРЫТЬ ПОРТ $MT_PROXY_PORT В ФАЕРВОЛЕ ХОСТИНГА!${NC}"
         echo -e "${YELLOW}💡 Если ufw активен, порт уже открыт автоматически${NC}"
+        echo -e "${YELLOW}💡 Также проверь панель хостинга - нужно открыть TCP $MT_PROXY_PORT${NC}"
         echo ""
         ;;
     
