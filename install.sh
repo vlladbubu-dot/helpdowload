@@ -11,6 +11,14 @@ fi
 
 systemctl stop unattended-upgrades 2>/dev/null
 systemctl disable unattended-upgrades 2>/dev/null
+killall unattended-upgrades 2>/dev/null
+killall apt 2>/dev/null
+killall apt-get 2>/dev/null
+sleep 3
+rm -f /var/lib/dpkg/lock-frontend
+rm -f /var/lib/dpkg/lock
+rm -f /var/cache/apt/archives/lock
+dpkg --configure -a
 
 clear
 echo "=========================================="
@@ -250,7 +258,8 @@ EOF
         echo ""
         echo "📁 Файлы сайта: /var/www/$DOMAIN/html/"
         echo ""
-        echo "⚠️ ОТКРОЙ ПОРТЫ: sudo ufw allow 80,443/tcp"
+        echo "⚠️ ОТКРОЙ ПОРТЫ В ФАЕРВОЛЕ ХОСТИНГА"
+        echo "💡 Команда для открытия портов: sudo ufw allow 80,443/tcp"
         echo ""
         ;;
     
@@ -265,11 +274,11 @@ EOF
         
         echo ""
         echo -e "${RED}⚠️ ВНИМАНИЕ! ОТКРОЙТЕ ПОРТ В ФАЕРВОЛЕ ХОСТИНГА!${NC}"
-        echo -e "${YELLOW}💡 Посмотри выше порт панели (например: 54321) и выполни:${NC}"
+        echo -e "${YELLOW}💡 Посмотри выше порт панели и выполни:${NC}"
         echo -e "${GREEN}   sudo ufw allow ПОРТ_ПАНЕЛИ/tcp${NC}"
         echo ""
         echo -e "${RED}⚠️ ДЛЯ КАЖДОГО ИНБАУНДА ТОЖЕ НУЖНО ОТКРЫВАТЬ ПОРТЫ!${NC}"
-        echo -e "${YELLOW}💡 Когда добавишь инбаунд, его порт тоже надо открыть:${NC}"
+        echo -e "${YELLOW}💡 Когда добавишь инбаунд, открой его порт:${NC}"
         echo -e "${GREEN}   sudo ufw allow ПОРТ_ИНБАУНДА/tcp${NC}"
         echo ""
         ;;
@@ -286,11 +295,11 @@ EOF
         
         echo ""
         echo -e "${RED}⚠️ ВНИМАНИЕ! ОТКРОЙТЕ ПОРТ В ФАЕРВОЛЕ ХОСТИНГА!${NC}"
-        echo -e "${YELLOW}💡 Посмотри выше порт панели (например: 54321) и выполни:${NC}"
+        echo -e "${YELLOW}💡 Посмотри выше порт панели и выполни:${NC}"
         echo -e "${GREEN}   sudo ufw allow ПОРТ_ПАНЕЛИ/tcp${NC}"
         echo ""
         echo -e "${RED}⚠️ ДЛЯ КАЖДОГО ИНБАУНДА ТОЖЕ НУЖНО ОТКРЫВАТЬ ПОРТЫ!${NC}"
-        echo -e "${YELLOW}💡 Когда добавишь инбаунд, его порт тоже надо открыть:${NC}"
+        echo -e "${YELLOW}💡 Когда добавишь инбаунд, открой его порт:${NC}"
         echo -e "${GREEN}   sudo ufw allow ПОРТ_ИНБАУНДА/tcp${NC}"
         echo ""
         
@@ -519,7 +528,8 @@ EOF
         echo ""
         echo "📁 Файлы сайта: /var/www/$DOMAIN/html/"
         echo ""
-        echo "⚠️ ОТКРОЙ ПОРТЫ: sudo ufw allow 80,443/tcp"
+        echo "⚠️ ОТКРОЙ ПОРТЫ В ФАЕРВОЛЕ ХОСТИНГА"
+        echo "💡 Команда для открытия портов: sudo ufw allow 80,443/tcp"
         echo ""
         ;;
     
@@ -574,14 +584,15 @@ EOF
         echo "📁 Папка: /my_bots/test/"
         echo "📄 Файл: main.py"
         echo ""
-        echo "🔧 Управление:"
+        echo "🔧 Управление скриптом:"
         echo "💡 Остановить: systemctl stop test"
         echo "💡 Запустить: systemctl start test"
         echo "💡 Перезапустить: systemctl restart test"
-        echo "💡 Статус: systemctl status test"
-        echo "💡 Логи: journalctl -u test -f"
+        echo "💡 Посмотреть статус: systemctl status test"
+        echo "💡 Посмотреть логи: journalctl -u test -f"
         echo ""
-        echo "⚠️ nano /my_bots/test/main.py (после изменений: systemctl restart test)"
+        echo "⚠️ Ты можешь отредактировать файл: nano /my_bots/test/main.py"
+        echo "⚠️ После изменений перезапусти скрипт: systemctl restart test"
         echo ""
         ;;
     
@@ -614,12 +625,14 @@ EOF
         systemctl enable fail2ban
         
         echo ""
-        echo "✅ Fail2ban установлен"
-        echo "📝 Попыток: 3 | Бан: навсегда"
+        echo "✅ Fail2ban установлен и настроен"
+        echo "📝 Максимум попыток: 3"
+        echo "⏱️ Время бана: навсегда"
         echo ""
-        echo "🔧 Команды:"
-        echo "💡 Забаненные IP: fail2ban-client status sshd"
-        echo "💡 Разбанить: fail2ban-client set sshd unbanip IP"
+        echo "🔧 Управление:"
+        echo "💡 Посмотреть забаненных: fail2ban-client status sshd"
+        echo "💡 Разбанить IP: fail2ban-client set sshd unbanip IP"
+        echo "💡 Статус: systemctl status fail2ban"
         echo ""
         ;;
     
