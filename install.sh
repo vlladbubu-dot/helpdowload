@@ -536,39 +536,65 @@ EOF
         ;;
     
     4)
-        mkdir -p /my_bots/test
-        cd /my_bots/test
+        read -p "Введи имя службы (например: mybot, test, app): " SERVICE_NAME
+        if [[ -z "$SERVICE_NAME" ]]; then
+            SERVICE_NAME="mybot"
+        fi
         
-        cat > main.py <<EOF
+        SERVICE_NAME=$(echo "$SERVICE_NAME" | tr ' ' '_' | tr -cd 'a-zA-Z0-9_-')
+        
+        mkdir -p /my_bots/$SERVICE_NAME
+        cd /my_bots/$SERVICE_NAME
+        
+        echo ""
+        echo -e "${YELLOW}📝 Введи код Python скрипта (Enter - будет использован простой скрипт):${NC}"
+        echo -e "${BLUE}💡 Когда закончишь писать, нажми Ctrl+D${NC}"
+        echo ""
+        
+        read -r -d '' DEFAULT_SCRIPT <<'EOF'
 import time
 import datetime
 
 def main():
-    print(f"Бот запущен: {datetime.datetime.now()}")
+    print(f"Бот {SERVICE_NAME} запущен: {datetime.datetime.now()}")
     while True:
-        print("Работаю...")
+        print(f"{SERVICE_NAME}: Работаю... {datetime.datetime.now()}")
         time.sleep(60)
 
 if __name__ == "__main__":
     main()
 EOF
         
+        DEFAULT_SCRIPT=$(echo "$DEFAULT_SCRIPT" | sed "s/{SERVICE_NAME}/$SERVICE_NAME/g")
+        
+        TEMP_FILE=$(mktemp)
+        cat > "$TEMP_FILE"
+        SCRIPT_CONTENT=$(cat "$TEMP_FILE")
+        rm -f "$TEMP_FILE"
+        
+        if [[ -z "$SCRIPT_CONTENT" ]]; then
+            echo "$DEFAULT_SCRIPT" > main.py
+            echo -e "${GREEN}✅ Использован стандартный скрипт${NC}"
+        else
+            echo "$SCRIPT_CONTENT" > main.py
+            echo -e "${GREEN}✅ Использован твой скрипт${NC}"
+        fi
+        
         apt install -y python3.12-venv
         python3 -m venv venv
         source venv/bin/activate
         
-        mkdir -p systemd
-        cat > systemd/test.service <<EOF
+        cat > /etc/systemd/system/$SERVICE_NAME.service <<EOF
 [Unit]
-Description=test
+Description=$SERVICE_NAME
 After=syslog.target
 After=network.target
 
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/my_bots/test/
-ExecStart=/my_bots/test/venv/bin/python3 /my_bots/test/main.py
+WorkingDirectory=/my_bots/$SERVICE_NAME/
+ExecStart=/my_bots/$SERVICE_NAME/venv/bin/python3 /my_bots/$SERVICE_NAME/main.py
 RestartSec=10
 Restart=always
 
@@ -576,25 +602,24 @@ Restart=always
 WantedBy=multi-user.target
 EOF
         
-        apt install -y systemd
         systemctl daemon-reload
-        systemctl enable /my_bots/test/systemd/test.service
-        systemctl start test
+        systemctl enable $SERVICE_NAME
+        systemctl start $SERVICE_NAME
         
         echo ""
-        echo "✅ Python скрипт установлен и запущен"
-        echo "📁 Папка: /my_bots/test/"
-        echo "📄 Файл: main.py"
+        echo -e "${GREEN}✅ Python скрипт '$SERVICE_NAME' установлен и запущен${NC}"
+        echo -e "${YELLOW}📁 Папка:${NC} /my_bots/$SERVICE_NAME/"
+        echo -e "${YELLOW}📄 Файл:${NC} main.py"
         echo ""
-        echo "🔧 Управление скриптом:"
-        echo "💡 Остановить: systemctl stop test"
-        echo "💡 Запустить: systemctl start test"
-        echo "💡 Перезапустить: systemctl restart test"
-        echo "💡 Посмотреть статус: systemctl status test"
-        echo "💡 Посмотреть логи: journalctl -u test -f"
+        echo -e "${BLUE}🔧 Управление скриптом:${NC}"
+        echo -e "   💡 Остановить:     ${GREEN}systemctl stop $SERVICE_NAME${NC}"
+        echo -e "   💡 Запустить:      ${GREEN}systemctl start $SERVICE_NAME${NC}"
+        echo -e "   💡 Перезапустить:  ${GREEN}systemctl restart $SERVICE_NAME${NC}"
+        echo -e "   💡 Статус:         ${GREEN}systemctl status $SERVICE_NAME${NC}"
+        echo -e "   💡 Логи:           ${GREEN}journalctl -u $SERVICE_NAME -f${NC}"
         echo ""
-        echo "⚠️ Ты можешь отредактировать файл: nano /my_bots/test/main.py"
-        echo "⚠️ После изменений перезапусти скрипт: systemctl restart test"
+        echo -e "${YELLOW}⚠️ Редактирование:${NC} nano /my_bots/$SERVICE_NAME/main.py"
+        echo -e "${YELLOW}⚠️ После изменений:${NC} systemctl restart $SERVICE_NAME"
         echo ""
         ;;
     
