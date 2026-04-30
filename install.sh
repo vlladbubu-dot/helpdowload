@@ -1,7 +1,7 @@
 #!/bin/bash
-
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+RED='\033[0;31m'
 NC='\033[0m'
 
 if [[ $EUID -ne 0 ]]; then
@@ -18,7 +18,7 @@ echo "       Помощник в настройке вашего сервера"
 echo "=========================================="
 echo ""
 echo "1. Сайт"
-echo "2. Панель 3x-ui (REALITY + XHTTP)"
+echo "2. Панель 3x-ui"
 echo "3. Сайт + Панель 3x-ui"
 echo "4. Python скрипт/бот"
 echo "5. Fail2ban"
@@ -30,13 +30,19 @@ case $choice in
         read -p "Домен: " DOMAIN
         [[ -z "$DOMAIN" ]] && echo "Ошибка" && exit 1
         
+        if [[ $(echo "$DOMAIN" | grep -o '\.' | wc -l) -ge 2 ]]; then
+            IS_SUBDOMAIN=true
+        else
+            IS_SUBDOMAIN=false
+        fi
+        
         apt update -y
         apt install -y nginx certbot python3-certbot-nginx
         
         mkdir -p /var/www/$DOMAIN/html
         echo "<h1>$DOMAIN работает</h1>" > /var/www/$DOMAIN/html/index.html
         
-        if [[ "$DOMAIN" =~ ^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}$ ]] || [[ "$DOMAIN" =~ ^[a-zA-Z0-9-]+\.[a-zA-Z0-9-]+\.[a-zA-Z]{2,}$ ]]; then
+        if [[ "$IS_SUBDOMAIN" == true ]]; then
             cat > /etc/nginx/sites-available/$DOMAIN <<EOF
 server {
     listen 80;
@@ -71,14 +77,14 @@ EOF
         systemctl restart nginx
         
         systemctl stop nginx
-        if [[ "$DOMAIN" =~ ^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}$ ]] || [[ "$DOMAIN" =~ ^[a-zA-Z0-9-]+\.[a-zA-Z0-9-]+\.[a-zA-Z]{2,}$ ]]; then
+        if [[ "$IS_SUBDOMAIN" == true ]]; then
             certbot certonly --standalone --agree-tos --email admin@$DOMAIN --domains $DOMAIN
         else
             certbot certonly --standalone --agree-tos --email admin@$DOMAIN --domains $DOMAIN --domains www.$DOMAIN
         fi
         systemctl start nginx
         
-        if [[ "$DOMAIN" =~ ^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}$ ]] || [[ "$DOMAIN" =~ ^[a-zA-Z0-9-]+\.[a-zA-Z0-9-]+\.[a-zA-Z]{2,}$ ]]; then
+        if [[ "$IS_SUBDOMAIN" == true ]]; then
             cat > /etc/nginx/sites-available/$DOMAIN <<EOF
 server {
     listen 80;
@@ -123,155 +129,68 @@ EOF
         
         echo ""
         echo "✅ Сайт: https://$DOMAIN"
+        if [[ "$IS_SUBDOMAIN" == false ]]; then
+            echo "✅ Также доступен: https://www.$DOMAIN"
+        fi
         echo ""
         echo "📁 Файлы сайта: /var/www/$DOMAIN/html/"
-        echo "💡 ufw allow 80,443/tcp"
+        echo ""
+        echo "⚠️ ОТКРОЙ ПОРТЫ: sudo ufw allow 80,443/tcp"
         echo ""
         ;;
     
     2)
-        apt update -y
-        apt install -y ufw curl wget sqlite3 openssl
-        
         bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh)
-        
-        sleep 3
-        systemctl stop x-ui
-        
-        PANEL_PORT=5467
-        REALITY_PORT=5555
-        XHTTP_PORT=4444
-        WEB_BASE_PATH=$(openssl rand -hex 8)
-        USERNAME=$(openssl rand -hex 5)
-        PASSWORD=$(openssl rand -hex 8)
-        
-        REALITY_ID=$(/usr/local/x-ui/bin/xray-linux-amd64 uuid)
-        XHTTP_ID=$(/usr/local/x-ui/bin/xray-linux-amd64 uuid)
-        
-        REALITY_KEYS=$(/usr/local/x-ui/bin/xray-linux-amd64 x25519)
-        REALITY_PRIVATE=$(echo "$REALITY_KEYS" | grep "Private key:" | awk '{print $3}')
-        REALITY_PUBLIC=$(echo "$REALITY_KEYS" | grep "Public key:" | awk '{print $3}')
-        REALITY_SHORT_ID=$(openssl rand -hex 8)
-        
-        XHTTP_PATH=$(openssl rand -hex 10)
-        
-        /usr/local/x-ui/x-ui setting -username "$USERNAME" -password "$PASSWORD" -port "$PANEL_PORT" -webBasePath "$WEB_BASE_PATH"
-        
-        ufw allow "$PANEL_PORT"/tcp
-        ufw allow "$REALITY_PORT"/tcp
-        ufw allow "$XHTTP_PORT"/tcp
-        
-        sqlite3 /etc/x-ui/x-ui.db <<EOF
-DELETE FROM inbounds;
-INSERT INTO "inbounds" ("user_id","up","down","total","remark","enable","expiry_time","listen","port","protocol","settings","stream_settings","tag","sniffing") VALUES 
-('1','0','0','0','🇷🇺 REALITY','1','0','','$REALITY_PORT','vless','{\"clients\":[{\"id\":\"$REALITY_ID\",\"flow\":\"xtls-rprx-vision\",\"email\":\"reality\",\"limitIp\":0,\"totalGB\":0,\"expiryTime\":0,\"enable\":true}],\"decryption\":\"none\",\"fallbacks\":[]}','{\"network\":\"tcp\",\"security\":\"reality\",\"realitySettings\":{\"show\":false,\"xver\":0,\"target\":\"www.google.com\",\"serverNames\":[\"www.google.com\"],\"privateKey\":\"$REALITY_PRIVATE\",\"shortIds\":[\"$REALITY_SHORT_ID\"],\"settings\":{\"publicKey\":\"$REALITY_PUBLIC\",\"fingerprint\":\"chrome\",\"serverName\":\"\",\"spiderX\":\"/\"}}}','inbound-reality','{\"enabled\":true,\"destOverride\":[\"http\",\"tls\"]}'),
-('1','0','0','0','🇷🇺 XHTTP','1','0','/dev/shm/xhttp.sock,0666','0','vless','{\"clients\":[{\"id\":\"$XHTTP_ID\",\"flow\":\"\",\"email\":\"xhttp\",\"limitIp\":0,\"totalGB\":0,\"expiryTime\":0,\"enable\":true}],\"decryption\":\"none\",\"fallbacks\":[]}','{\"network\":\"xhttp\",\"security\":\"none\",\"xhttpSettings\":{\"path\":\"/$XHTTP_PATH\",\"host\":\"\",\"mode\":\"packet-up\"}}','inbound-xhttp','{\"enabled\":true,\"destOverride\":[\"http\",\"tls\"]}');
-EOF
-        
-        systemctl start x-ui
-        
-        SERVER_IP=$(curl -s ifconfig.me)
         
         echo ""
         echo "✅ Панель установлена"
         echo ""
-        echo "═══════════════════════════════════════════"
-        echo "🔗 ДОСТУП К ПАНЕЛИ:"
-        echo "🌐 http://$SERVER_IP:$PANEL_PORT/$WEB_BASE_PATH"
-        echo "🔐 Username: $USERNAME"
-        echo "🔐 Password: $PASSWORD"
+        
+        x-ui
+        echo "10"
+        
         echo ""
-        echo "📡 ИНБАУНДЫ:"
+        echo -e "${RED}⚠️ ВНИМАНИЕ! ОТКРОЙТЕ ПОРТ В ФАЕРВОЛЕ ХОСТИНГА!${NC}"
+        echo -e "${YELLOW}💡 Посмотри выше порт панели (например: 54321) и выполни:${NC}"
+        echo -e "${GREEN}   sudo ufw allow ПОРТ_ПАНЕЛИ/tcp${NC}"
         echo ""
-        echo "▶ REALITY (рекомендуется с доменом):"
-        echo "   Порт: $REALITY_PORT"
-        echo "   ID: $REALITY_ID"
-        echo "   PublicKey: $REALITY_PUBLIC"
-        echo "   ShortId: $REALITY_SHORT_ID"
-        echo ""
-        echo "▶ XHTTP (без домена):"
-        echo "   Порт: $XHTTP_PORT"
-        echo "   ID: $XHTTP_ID"
-        echo "   Path: /$XHTTP_PATH"
-        echo ""
-        echo "═══════════════════════════════════════════"
-        echo "💡 СОХРАНИ ЭТИ ДАННЫЕ!"
-        echo "🔓 Порты открыты: $PANEL_PORT, $REALITY_PORT, $XHTTP_PORT"
+        echo -e "${RED}⚠️ ДЛЯ КАЖДОГО ИНБАУНДА ТОЖЕ НУЖНО ОТКРЫВАТЬ ПОРТЫ!${NC}"
+        echo -e "${YELLOW}💡 Когда добавишь инбаунд, его порт тоже надо открыть:${NC}"
+        echo -e "${GREEN}   sudo ufw allow ПОРТ_ИНБАУНДА/tcp${NC}"
         echo ""
         ;;
     
     3)
         echo "Устанавливаю панель..."
-        apt update -y
-        apt install -y ufw curl wget sqlite3 openssl
-        
         bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh)
-        
-        sleep 3
-        systemctl stop x-ui
-        
-        PANEL_PORT=5467
-        REALITY_PORT=5555
-        XHTTP_PORT=4444
-        WEB_BASE_PATH=$(openssl rand -hex 8)
-        USERNAME=$(openssl rand -hex 5)
-        PASSWORD=$(openssl rand -hex 8)
-        
-        REALITY_ID=$(/usr/local/x-ui/bin/xray-linux-amd64 uuid)
-        XHTTP_ID=$(/usr/local/x-ui/bin/xray-linux-amd64 uuid)
-        
-        REALITY_KEYS=$(/usr/local/x-ui/bin/xray-linux-amd64 x25519)
-        REALITY_PRIVATE=$(echo "$REALITY_KEYS" | grep "Private key:" | awk '{print $3}')
-        REALITY_PUBLIC=$(echo "$REALITY_KEYS" | grep "Public key:" | awk '{print $3}')
-        REALITY_SHORT_ID=$(openssl rand -hex 8)
-        
-        XHTTP_PATH=$(openssl rand -hex 10)
-        
-        /usr/local/x-ui/x-ui setting -username "$USERNAME" -password "$PASSWORD" -port "$PANEL_PORT" -webBasePath "$WEB_BASE_PATH"
-        
-        ufw allow "$PANEL_PORT"/tcp
-        ufw allow "$REALITY_PORT"/tcp
-        ufw allow "$XHTTP_PORT"/tcp
-        
-        sqlite3 /etc/x-ui/x-ui.db <<EOF
-DELETE FROM inbounds;
-INSERT INTO "inbounds" ("user_id","up","down","total","remark","enable","expiry_time","listen","port","protocol","settings","stream_settings","tag","sniffing") VALUES 
-('1','0','0','0','🇷🇺 REALITY','1','0','','$REALITY_PORT','vless','{\"clients\":[{\"id\":\"$REALITY_ID\",\"flow\":\"xtls-rprx-vision\",\"email\":\"reality\",\"limitIp\":0,\"totalGB\":0,\"expiryTime\":0,\"enable\":true}],\"decryption\":\"none\",\"fallbacks\":[]}','{\"network\":\"tcp\",\"security\":\"reality\",\"realitySettings\":{\"show\":false,\"xver\":0,\"target\":\"www.google.com\",\"serverNames\":[\"www.google.com\"],\"privateKey\":\"$REALITY_PRIVATE\",\"shortIds\":[\"$REALITY_SHORT_ID\"],\"settings\":{\"publicKey\":\"$REALITY_PUBLIC\",\"fingerprint\":\"chrome\",\"serverName\":\"\",\"spiderX\":\"/\"}}}','inbound-reality','{\"enabled\":true,\"destOverride\":[\"http\",\"tls\"]}'),
-('1','0','0','0','🇷🇺 XHTTP','1','0','/dev/shm/xhttp.sock,0666','0','vless','{\"clients\":[{\"id\":\"$XHTTP_ID\",\"flow\":\"\",\"email\":\"xhttp\",\"limitIp\":0,\"totalGB\":0,\"expiryTime\":0,\"enable\":true}],\"decryption\":\"none\",\"fallbacks\":[]}','{\"network\":\"xhttp\",\"security\":\"none\",\"xhttpSettings\":{\"path\":\"/$XHTTP_PATH\",\"host\":\"\",\"mode\":\"packet-up\"}}','inbound-xhttp','{\"enabled\":true,\"destOverride\":[\"http\",\"tls\"]}');
-EOF
-        
-        systemctl start x-ui
-        
-        SERVER_IP=$(curl -s ifconfig.me)
         
         echo ""
         echo "✅ Панель установлена"
         echo ""
-        echo "═══════════════════════════════════════════"
-        echo "🔗 ДОСТУП К ПАНЕЛИ:"
-        echo "🌐 http://$SERVER_IP:$PANEL_PORT/$WEB_BASE_PATH"
-        echo "🔐 Username: $USERNAME"
-        echo "🔐 Password: $PASSWORD"
+        
+        x-ui
+        echo "10"
+        
         echo ""
-        echo "📡 ИНБАУНДЫ:"
+        echo -e "${RED}⚠️ ВНИМАНИЕ! ОТКРОЙТЕ ПОРТ В ФАЕРВОЛЕ ХОСТИНГА!${NC}"
+        echo -e "${YELLOW}💡 Посмотри выше порт панели (например: 54321) и выполни:${NC}"
+        echo -e "${GREEN}   sudo ufw allow ПОРТ_ПАНЕЛИ/tcp${NC}"
         echo ""
-        echo "▶ REALITY:"
-        echo "   Порт: $REALITY_PORT"
-        echo "   ID: $REALITY_ID"
-        echo "   PublicKey: $REALITY_PUBLIC"
-        echo "   ShortId: $REALITY_SHORT_ID"
-        echo ""
-        echo "▶ XHTTP:"
-        echo "   Порт: $XHTTP_PORT"
-        echo "   ID: $XHTTP_ID"
-        echo "   Path: /$XHTTP_PATH"
-        echo "═══════════════════════════════════════════"
+        echo -e "${RED}⚠️ ДЛЯ КАЖДОГО ИНБАУНДА ТОЖЕ НУЖНО ОТКРЫВАТЬ ПОРТЫ!${NC}"
+        echo -e "${YELLOW}💡 Когда добавишь инбаунд, его порт тоже надо открыть:${NC}"
+        echo -e "${GREEN}   sudo ufw allow ПОРТ_ИНБАУНДА/tcp${NC}"
         echo ""
         
         read -p "Нажми Enter, чтобы продолжить установку сайта..."
         
-        read -p "Домен: " DOMAIN
+        read -p "Домен для сайта: " DOMAIN
         [[ -z "$DOMAIN" ]] && echo "Ошибка" && exit 1
+        
+        if [[ $(echo "$DOMAIN" | grep -o '\.' | wc -l) -ge 2 ]]; then
+            IS_SUBDOMAIN=true
+        else
+            IS_SUBDOMAIN=false
+        fi
         
         apt update -y
         apt install -y nginx certbot python3-certbot-nginx
@@ -279,7 +198,7 @@ EOF
         mkdir -p /var/www/$DOMAIN/html
         echo "<h1>$DOMAIN работает</h1>" > /var/www/$DOMAIN/html/index.html
         
-        if [[ "$DOMAIN" =~ ^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}$ ]] || [[ "$DOMAIN" =~ ^[a-zA-Z0-9-]+\.[a-zA-Z0-9-]+\.[a-zA-Z]{2,}$ ]]; then
+        if [[ "$IS_SUBDOMAIN" == true ]]; then
             cat > /etc/nginx/sites-available/$DOMAIN <<EOF
 server {
     listen 80;
@@ -314,14 +233,14 @@ EOF
         systemctl restart nginx
         
         systemctl stop nginx
-        if [[ "$DOMAIN" =~ ^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}$ ]] || [[ "$DOMAIN" =~ ^[a-zA-Z0-9-]+\.[a-zA-Z0-9-]+\.[a-zA-Z]{2,}$ ]]; then
+        if [[ "$IS_SUBDOMAIN" == true ]]; then
             certbot certonly --standalone --agree-tos --email admin@$DOMAIN --domains $DOMAIN
         else
             certbot certonly --standalone --agree-tos --email admin@$DOMAIN --domains $DOMAIN --domains www.$DOMAIN
         fi
         systemctl start nginx
         
-        if [[ "$DOMAIN" =~ ^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}$ ]] || [[ "$DOMAIN" =~ ^[a-zA-Z0-9-]+\.[a-zA-Z0-9-]+\.[a-zA-Z]{2,}$ ]]; then
+        if [[ "$IS_SUBDOMAIN" == true ]]; then
             cat > /etc/nginx/sites-available/$DOMAIN <<EOF
 server {
     listen 80;
@@ -366,8 +285,13 @@ EOF
         
         echo ""
         echo "✅ Сайт: https://$DOMAIN"
+        if [[ "$IS_SUBDOMAIN" == false ]]; then
+            echo "✅ Также доступен: https://www.$DOMAIN"
+        fi
+        echo ""
         echo "📁 Файлы сайта: /var/www/$DOMAIN/html/"
-        echo "💡 ufw allow 80,443/tcp"
+        echo ""
+        echo "⚠️ ОТКРОЙ ПОРТЫ: sudo ufw allow 80,443/tcp"
         echo ""
         ;;
     
@@ -420,9 +344,16 @@ EOF
         echo ""
         echo "✅ Python скрипт установлен и запущен"
         echo "📁 Папка: /my_bots/test/"
+        echo "📄 Файл: main.py"
         echo ""
-        echo "🔧 Управление: systemctl stop/start/restart/status test"
-        echo "📋 Логи: journalctl -u test -f"
+        echo "🔧 Управление:"
+        echo "💡 Остановить: systemctl stop test"
+        echo "💡 Запустить: systemctl start test"
+        echo "💡 Перезапустить: systemctl restart test"
+        echo "💡 Статус: systemctl status test"
+        echo "💡 Логи: journalctl -u test -f"
+        echo ""
+        echo "⚠️ nano /my_bots/test/main.py (после изменений: systemctl restart test)"
         echo ""
         ;;
     
@@ -456,12 +387,11 @@ EOF
         
         echo ""
         echo "✅ Fail2ban установлен"
-        echo "📝 Максимум попыток: 3"
-        echo "⏱️ Время бана: навсегда"
+        echo "📝 Попыток: 3 | Бан: навсегда"
         echo ""
         echo "🔧 Команды:"
-        echo "📋 Статус: fail2ban-client status sshd"
-        echo "🔓 Разбанить IP: fail2ban-client set sshd unbanip IP"
+        echo "💡 Забаненные IP: fail2ban-client status sshd"
+        echo "💡 Разбанить: fail2ban-client set sshd unbanip IP"
         echo ""
         ;;
     
