@@ -2,6 +2,7 @@
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
+BLUE='\033[0;34m'
 NC='\033[0m'
 
 if [[ $EUID -ne 0 ]]; then
@@ -30,8 +31,9 @@ echo "2. Панель 3x-ui"
 echo "3. Сайт + Панель 3x-ui"
 echo "4. Python скрипт/бот"
 echo "5. Fail2ban"
+echo "6. MTProto Proxy (Telegram)"
 echo ""
-read -p "Выбери [1-5]: " choice
+read -p "Выбери [1-6]: " choice
 
 case $choice in
     1)
@@ -633,6 +635,90 @@ EOF
         echo "💡 Посмотреть забаненных: fail2ban-client status sshd"
         echo "💡 Разбанить IP: fail2ban-client set sshd unbanip IP"
         echo "💡 Статус: systemctl status fail2ban"
+        echo ""
+        ;;
+    
+    6)
+        MT_PROXY_PORT=1047
+        
+        echo -e "${YELLOW}🔧 Устанавливаю MTProto Proxy на порт $MT_PROXY_PORT...${NC}"
+        
+        apt update -y
+        apt install -y git curl build-essential
+        
+        cd /opt
+        
+        if [ -d "mtprotoproxy" ]; then
+            rm -rf mtprotoproxy
+        fi
+        
+        git clone https://github.com/alexbers/mtprotoproxy.git
+        cd mtprotoproxy
+        
+        SECRET=$(head -c 16 /dev/urandom | xxd -ps)
+        
+        cat > config.py <<EOF
+PORT = $MT_PROXY_PORT
+USERS = {
+    "$SECRET": [-1.0, False],
+}
+EOF
+        
+        apt install -y python3 python3-crypto
+        
+        useradd -r -s /bin/false mtproxy 2>/dev/null
+        
+        cat > /etc/systemd/system/mtproxy.service <<EOF
+[Unit]
+Description=MTProto Proxy Server
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/mtprotoproxy
+ExecStart=/usr/bin/python3 /opt/mtprotoproxy/mtprotoproxy.py
+Restart=on-failure
+RestartSec=10
+User=mtproxy
+
+[Install]
+WantedBy=multi-user.target
+EOF
+        
+        ufw allow $MT_PROXY_PORT/tcp 2>/dev/null
+        
+        systemctl daemon-reload
+        systemctl enable mtproxy
+        systemctl start mtproxy
+        
+        SERVER_IP=$(curl -s ifconfig.me)
+        
+        echo ""
+        echo -e "${GREEN}✅ MTProto Proxy установлен!${NC}"
+        echo ""
+        echo -e "${BLUE}📋 Данные для подключения:${NC}"
+        echo -e "${YELLOW}   Сервер:${NC} $SERVER_IP"
+        echo -e "${YELLOW}   Порт:${NC} $MT_PROXY_PORT"
+        echo -e "${YELLOW}   Секрет:${NC} $SECRET"
+        echo ""
+        echo -e "${GREEN}🔗 Ссылка для Telegram:${NC}"
+        echo -e "${BLUE}   tg://proxy?server=$SERVER_IP&port=$MT_PROXY_PORT&secret=$SECRET${NC}"
+        echo ""
+        echo -e "${YELLOW}💡 Как подключиться:${NC}"
+        echo "   1. Открой Telegram → Настройки → Данные и память"
+        echo "   2. Нажми 'Использовать прокси' → 'Добавить прокси'"
+        echo "   3. Тип: MTProto, Введи сервер, порт и секрет"
+        echo "   4. Или просто нажми на ссылку выше (на телефоне)"
+        echo ""
+        echo -e "${YELLOW}🔧 Управление прокси:${NC}"
+        echo "   💡 Запустить:   systemctl start mtproxy"
+        echo "   💡 Остановить:  systemctl stop mtproxy"
+        echo "   💡 Перезапуск:  systemctl restart mtproxy"
+        echo "   💡 Статус:      systemctl status mtproxy"
+        echo "   💡 Логи:        journalctl -u mtproxy -f"
+        echo ""
+        echo -e "${RED}⚠️ НЕ ЗАБУДЬ ОТКРЫТЬ ПОРТ $MT_PROXY_PORT В ФАЕРВОЛЕ ХОСТИНГА!${NC}"
+        echo -e "${YELLOW}💡 Если ufw активен, порт уже открыт автоматически${NC}"
         echo ""
         ;;
     
