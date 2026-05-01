@@ -534,39 +534,39 @@ EOF
         ;;
     
     4)
-        mkdir -p /my_bots/test
-        cd /my_bots/test
+        read -p "Введи имя бота/скрипта: " BOT_NAME
+        [[ -z "$BOT_NAME" ]] && echo "Ошибка" && exit 1
         
-        cat > main.py <<EOF
-import time
-import datetime
-
-def main():
-    print(f"Бот запущен: {datetime.datetime.now()}")
-    while True:
-        print("Работаю...")
-        time.sleep(60)
-
-if __name__ == "__main__":
-    main()
-EOF
+        mkdir -p /my_bots/$BOT_NAME
+        cd /my_bots/$BOT_NAME
+        
+        echo "Введи код Python (заверши Ctrl+D):"
+        cat > main.py
         
         apt install -y python3.12-venv
         python3 -m venv venv
         source venv/bin/activate
         
+        read -p "Введи библиотеки через пробел (или оставь пустым): " LIBS
+        if [[ -n "$LIBS" ]]; then
+            pip install $LIBS
+            pip freeze > requirements.txt
+        fi
+        
+        deactivate
+        
         mkdir -p systemd
-        cat > systemd/test.service <<EOF
+        cat > systemd/$BOT_NAME.service <<EOF
 [Unit]
-Description=test
+Description=$BOT_NAME
 After=syslog.target
 After=network.target
 
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/my_bots/test/
-ExecStart=/my_bots/test/venv/bin/python3 /my_bots/test/main.py
+WorkingDirectory=/my_bots/$BOT_NAME/
+ExecStart=/my_bots/$BOT_NAME/venv/bin/python3 /my_bots/$BOT_NAME/main.py
 RestartSec=10
 Restart=always
 
@@ -576,23 +576,23 @@ EOF
         
         apt install -y systemd
         systemctl daemon-reload
-        systemctl enable /my_bots/test/systemd/test.service
-        systemctl start test
+        systemctl enable /my_bots/$BOT_NAME/systemd/$BOT_NAME.service
+        systemctl start $BOT_NAME
         
         echo ""
         echo "✅ Python скрипт установлен и запущен"
-        echo "📁 Папка: /my_bots/test/"
+        echo "📁 Папка: /my_bots/$BOT_NAME/"
         echo "📄 Файл: main.py"
         echo ""
         echo "🔧 Управление скриптом:"
-        echo "💡 Остановить: systemctl stop test"
-        echo "💡 Запустить: systemctl start test"
-        echo "💡 Перезапустить: systemctl restart test"
-        echo "💡 Посмотреть статус: systemctl status test"
-        echo "💡 Посмотреть логи: journalctl -u test -f"
+        echo "💡 Остановить: systemctl stop $BOT_NAME"
+        echo "💡 Запустить: systemctl start $BOT_NAME"
+        echo "💡 Перезапустить: systemctl restart $BOT_NAME"
+        echo "💡 Посмотреть статус: systemctl status $BOT_NAME"
+        echo "💡 Посмотреть логи: journalctl -u $BOT_NAME -f"
         echo ""
-        echo "⚠️ Ты можешь отредактировать файл: nano /my_bots/test/main.py"
-        echo "⚠️ После изменений перезапусти скрипт: systemctl restart test"
+        echo "⚠️ Ты можешь отредактировать файл: nano /my_bots/$BOT_NAME/main.py"
+        echo "⚠️ После изменений перезапусти скрипт: systemctl restart $BOT_NAME"
         echo ""
         ;;
     
